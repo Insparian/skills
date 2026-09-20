@@ -1,0 +1,6 @@
+{
+  "FRONTIER": {"model": "gpt-6-astra", "effort": "low", "profile": "goal-frontier"},
+  "SENIOR": {"model": "gpt-5.6-sol", "effort": "medium", "profile": "goal-senior"},
+  "WORKHORSE": {"model": "gpt-5.6-terra", "effort": "medium", "profile": "goal-worker"},
+  "MECHANICAL": {"model": "gpt-5.6-luna", "effort": "low", "profile": "goal-mechanical"}
+}

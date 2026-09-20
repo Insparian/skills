@@ -1,0 +1,9 @@
+# Local specifications and private planning material
+/specs/
+
+# OS, Python, test, and runtime artifacts
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.goal-router/
