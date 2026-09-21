@@ -17,19 +17,21 @@ Carry out the following project brief. Preserve its acceptance criteria and auth
 [paste the full brief]
 ```
 
-Sol coordinates the mission. Terra handles reconnaissance, implementation, and ordinary repairs. Luna handles verifiable mechanical work. Astra handles bounded consequential decisions or audits when the evidence justifies them. The skill does not change the root model. If the runtime reliably identifies Astra as the root, the skill asks you to switch to Sol before repository work begins.
+Sol is a thin coordinator: it preserves authorization, chooses bounded slices, keeps the compact checkpoint, and makes the final criterion decision from worker evidence. Terra handles repository mapping, implementation, and ordinary repairs. Luna handles verifiable mechanical work. Astra handles bounded consequential decisions or audits when the evidence justifies them. The skill does not change the root model. If the runtime reliably identifies Astra as the root, the skill asks you to switch to Sol before repository work begins.
+
+Goal Router starts one worker by default. A second worker is allowed only when the user explicitly prioritizes wall-clock speed, both slices are independent, at most one writes, and neither is Astra. Astra always runs alone. See the [thin coordinator boundary](references/coordinator-boundary.md).
 
 ## Recovery after quota exhaustion
 
-At launch, Goal Router requests one built-in recurring check every thirty minutes **in the original task**. Sol performs a brief check without spawning a polling agent. Once a quota interruption is confirmed and usable quota returns, it reconciles partial changes and running work before continuing the unfinished slice. It reuses completed evidence and decisions that remain valid.
+At launch, Goal Router requests one built-in recurring check every thirty minutes **in the original task**. Sol performs a brief check without spawning a polling agent. Once a quota interruption is confirmed and usable quota returns, it dispatches a worker to reconcile partial changes and running work before continuing the unfinished slice. It reuses completed evidence and decisions that remain valid.
 
 The monitor stops after verified completion, a deliberate pause or cancellation, or a blocker requiring your decision or authorization. Unchanged checks stay quiet. Repeated invocation reuses a matching monitor instead of creating another one.
 
 The computer and desktop app must stay running. Checks can consume quota. The thirty-minute interval is a schedule, not a recovery-time guarantee; continued scheduling after real quota failure has not yet been tested overnight. A weekly limit can delay work beyond a five-hour window. If the built-in scheduling tool is unavailable, the skill reports that automatic recovery is unavailable and continues foreground work with durable checkpoints.
 
-## Diagnose model ownership
+## Enforce and diagnose model ownership
 
-If Sol appears to resume implementation after a worker returns, collect evidence before changing the routing policy. The optional local activity hook records event time, active model, tool identity and subagent start/stop identity. It deliberately excludes commands, patches, tool results, prompts, transcripts and code. See the [model activity diagnostic](references/model-activity-diagnostic.md). Hook installation is explicit and separate from normal skill installation.
+The optional project-local hook has two roles. Its activity log records event time, active model, tool identity and subagent start/stop identity while excluding commands, patches, tool results, prompts, transcripts and code. When Goal Router creates a policy marker, the same hook binds to the original task session, keeps every Sol turn tool-thin, limits file access to the checkpoint allowlist, and enforces the configured worker ceiling. See the [model activity diagnostic](references/model-activity-diagnostic.md). Hook installation is explicit and separate from normal skill installation; missing or untrusted hook support is reported as degraded enforcement.
 
 ## Install
 
@@ -49,7 +51,7 @@ Or install into one existing project:
 python3 scripts/install.py --project /absolute/path/to/project
 ```
 
-The installer copies only the skill package and four agent profiles. It does not edit `config.toml` or create automations. Codex normally discovers skill updates automatically; restart the app if the skill does not appear. Verify custom-agent availability in the actual runtime before relying on the model routing. Profile files existing on disk do not establish that a model call will succeed.
+The installer copies only the skill package and four agent profiles. It does not edit `config.toml`, install the project hook, or create automations. Codex normally discovers skill updates automatically; restart the app if the skill does not appear. Verify custom-agent availability in the actual runtime before relying on the model routing. Profile files existing on disk do not establish that a model call will succeed.
 
 ## Package layout
 
@@ -58,8 +60,8 @@ The installer copies only the skill package and four agent profiles. It does not
 | `SKILL.md` | Concise agent entry point |
 | `config/roles.json` | Single source for the four role-to-model mappings |
 | `codex-agents/` | Four generated custom-agent profiles |
-| `references/` | Routing, phase, context, recovery, monitoring, and diagnostic instructions |
-| `scripts/` | Local routing, state validation, simulation, installation, and optional diagnostic helpers |
+| `references/` | Coordinator boundary, routing, phase, context, recovery, monitoring, and diagnostic instructions |
+| `scripts/` | Local routing, state validation, simulation, installation, and optional hook/guard helpers |
 | `tests/` | Routing evaluations and recovery tests |
 | `evaluations/` | Validation evidence and limits |
 
@@ -76,7 +78,7 @@ python3 -B scripts/dry_run.py
 python3 -B scripts/simulate_checks.py
 ```
 
-The tests include 22 synthetic routing goals, authorization boundaries, context compression, interruption recovery, and a synthetic workflow using local files. The simulations do not invoke models or create live automations. Passing them does not prove real platform recovery. See [validation results](evaluations/validation.md) and [compatibility notes](references/compatibility.md).
+The tests include 22 synthetic routing goals, authorization boundaries, thin-coordinator tool ownership, worker concurrency, context compression, interruption recovery, and a synthetic workflow using local files. The simulations do not invoke models or create live automations. Passing them does not prove real platform recovery. See [validation results](evaluations/validation.md) and [compatibility notes](references/compatibility.md).
 
 Progress uses the target project's existing files when available. Otherwise, the skill establishes a `.goal-router/` directory in that project. Model calls and scheduled checks use the user's existing Codex service. Local helper scripts make no network requests or telemetry calls.
 

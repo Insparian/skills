@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from install_activity_hook import hook_config, install
 from model_activity_hook import append_record, make_record, resolve_log_path
+from coordinator_policy import create_policy
 
 
 class ActivityHookTests(unittest.TestCase):
@@ -71,6 +73,8 @@ class ActivityHookTests(unittest.TestCase):
             self.assertEqual(set(config['hooks']),
                              {'PreToolUse', 'PostToolUse', 'SubagentStart', 'SubagentStop'})
             self.assertTrue(Path(result['hook']).is_file())
+            self.assertTrue(Path(result['policy_hook']).is_file())
+            self.assertIn('--policy', json.dumps(config))
             with self.assertRaises(FileExistsError):
                 install(project)
 
@@ -79,6 +83,48 @@ class ActivityHookTests(unittest.TestCase):
         self.assertNotIn('async', serialized)
         self.assertNotIn('additionalContext', serialized)
         self.assertNotIn('tool_input', serialized)
+
+    def test_hook_denies_bound_sol_shell_without_logging_command(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / '.git').mkdir()
+            policy = project / '.goal-router/coordinator-policy.json'
+            create_policy(policy)
+            payload = {
+                'cwd': str(project), 'hook_event_name': 'PreToolUse',
+                'model': 'gpt-5.6-sol', 'turn_id': 'root-turn', 'session_id': 'task-session',
+                'tool_name': 'Bash', 'tool_use_id': 'call-1',
+                'tool_input': {'command': 'cat private-secret.py'},
+            }
+            result = subprocess.run(
+                [sys.executable, str(ROOT / 'scripts/model_activity_hook.py'),
+                 '--log', 'work/activity.jsonl',
+                 '--policy', '.goal-router/coordinator-policy.json'],
+                input=json.dumps(payload), text=True, capture_output=True, check=True)
+            decision = json.loads(result.stdout)
+            self.assertEqual(decision['hookSpecificOutput']['permissionDecision'], 'deny')
+            logged = (project / 'work/activity.jsonl').read_text()
+            self.assertNotIn('private-secret.py', logged)
+
+    def test_guard_failure_denies_pre_tool_call(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / '.git').mkdir()
+            policy = project / '.goal-router/coordinator-policy.json'
+            policy.parent.mkdir()
+            policy.write_text('{broken')
+            payload = {
+                'cwd': str(project), 'hook_event_name': 'PreToolUse',
+                'model': 'gpt-5.6-sol', 'turn_id': 'root-turn', 'session_id': 'task-session',
+                'tool_name': 'Bash', 'tool_use_id': 'call-1',
+                'tool_input': {'command': 'pytest'},
+            }
+            result = subprocess.run(
+                [sys.executable, str(ROOT / 'scripts/model_activity_hook.py'),
+                 '--log', 'work/activity.jsonl',
+                 '--policy', '.goal-router/coordinator-policy.json'],
+                input=json.dumps(payload), text=True, capture_output=True, check=True)
+            self.assertEqual(json.loads(result.stdout)['hookSpecificOutput']['permissionDecision'], 'deny')
 
 
 if __name__ == '__main__':

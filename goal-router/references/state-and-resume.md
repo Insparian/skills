@@ -33,11 +33,12 @@ The following is an illustrative valid structure, not a ready-to-run mission. Re
     "restore-round-trip": {"status": "pending", "evidence": []}
   },
   "monitor": {"id": null, "status": "unregistered", "interval_minutes": 30},
+  "coordinator_guard": {"status": "unconfirmed", "policy_path": null},
   "decisions": []
 }
 ```
 
-Allowed mission statuses: active, quota_wait, blocked, paused, cancelled, completed. An unexpected native termination may leave `active` on disk; check runtime evidence before deciding. A native Codex goal status is separate and remains governed by its host rules. `monitor.status` is unregistered, active, stopped or unavailable. Only a successful tool response supplies an active monitor ID. `pending_external_actions` holds required unresolved authorization gates, not optional actions beyond the mission.
+Allowed mission statuses: active, quota_wait, blocked, paused, cancelled, completed. An unexpected native termination may leave `active` on disk; check runtime evidence before deciding. A native Codex goal status is separate and remains governed by its host rules. `monitor.status` is unregistered, active, stopped or unavailable. Only a successful tool response supplies an active monitor ID. Optional `coordinator_guard.status` is active, unconfirmed or unavailable; a marker file alone does not prove active enforcement. `pending_external_actions` holds required unresolved authorization gates, not optional actions beyond the mission.
 
 Each original criterion has pending/verified/blocked status and evidence references. Add a verified decision entry with `id`, `evidence_fingerprint`, `result_path`; the fingerprint should cover the actual relevant files/diff and constraints used for that judgment, not just a convenient commit ID. Valid decisions survive context resets. A decision is stale only if changed dependencies or requirements materially affect it. Re-run affected checks, not every expensive review.
 
@@ -47,4 +48,4 @@ Save before dispatch with the intended slice, attempt identity, boundaries and n
 
 On recovery, inspect the current task's latest work status and partial artifacts before mutation. A worker may have completed a write, command or external action before the error. A running subprocess may outlive the model turn. Reconcile what actually happened, validate any completed part and continue only the remaining authorized work. If duplicate execution could cause an external side effect, verify its existing result first. Unknown status requires attention, not a retry.
 
-Validate with `python3 scripts/validate_state.py <checkpoint-path>`. The helper checks structure and evidence references, not the truth of evidence, completeness against the original brief, live scheduler state, external permissions or filesystem fingerprints. The coordinator performs those checks. A saved `completed` status is valid only when all original criteria are actually met and no required step remains; a fake evidence path does not constitute completion.
+Validate with `python3 scripts/validate_state.py <checkpoint-path>`. The helper checks structure and evidence references, not the truth of evidence, completeness against the original brief, live scheduler state, external permissions or filesystem fingerprints. A worker supplies those facts in a bounded criterion matrix; the coordinator decides whether they satisfy the original contract. A saved `completed` status is valid only when all original criteria are actually met and no required step remains; a fake evidence path does not constitute completion.

@@ -59,6 +59,26 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result['action'], 'blocked')
         self.assertIsNone(result['role'])
 
+    def test_deep_repository_work_uses_high_effort_workhorse(self):
+        result = route({'phase': 'repair', 'reasoning_depth': 'deep'})
+        self.assertEqual((result['role'], result['reasoning_effort']), ('WORKHORSE', 'high'))
+
+    def test_intake_and_final_are_coordinator_actions(self):
+        for phase in ('intake', 'final'):
+            result = route({'phase': phase})
+            self.assertEqual((result['action'], result['role']), ('coordinate', 'SENIOR'))
+
+    def test_worker_failure_becomes_bounded_judgment_not_sol_implementation(self):
+        result = route({'phase': 'repair', 'previous_role': 'WORKHORSE',
+                        'attempts_without_progress': 2, 'reasoning_failure': True})
+        self.assertEqual(result['action'], 'reclassify')
+        self.assertIsNone(result['role'])
+
+    def test_mechanical_verification_never_falls_back_to_sol(self):
+        result = route({'phase': 'verify', 'verifiability': 'yes'}, available_roles=['SENIOR'])
+        self.assertEqual(result['action'], 'blocked')
+        self.assertIsNone(result['role'])
+
     def test_no_frontier_for_volume_or_coding(self):
         for phase in ('recon', 'implementation', 'verify', 'repair'):
             result = route(dict(phase=phase, volume='high', security_sensitive=True,

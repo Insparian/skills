@@ -75,6 +75,13 @@ def route(task, roles=None, available_roles=None):
     if task.get('blocked_by'):
         return _result('blocked', 'Missing ' + task['blocked_by'], 'resolve_prerequisite')
 
+    if phase in ('intake', 'final'):
+        result = _result('coordinate', 'Mission preservation and the final criterion decision belong to the thin coordinator.',
+                         'new_consequential_judgment', 'SENIOR')
+        result.update(preferred_model=roles['SENIOR']['model'], reasoning_effort=roles['SENIOR']['effort'],
+                      profile=roles['SENIOR']['profile'], requested_role='SENIOR')
+        return result
+
     if phase in ('judgment', 'audit') and task.get('same_question') and not task.get('new_evidence'):
         if task.get('decision_valid'):
             return _result('reuse', 'Reuse the completed decision whose evidence is still valid.', 'new_evidence_only')
@@ -84,9 +91,7 @@ def route(task, roles=None, available_roles=None):
                      or task.get('blast_radius') == 'high'
                      or (task.get('failure_cost') == 'high' and task.get('ambiguity') == 'high'))
     trigger = None
-    if phase in ('intake', 'final'):
-        role, reason = 'SENIOR', 'Mission preservation and final integration belong to the coordinator.'
-    elif phase in ('judgment', 'audit'):
+    if phase in ('judgment', 'audit'):
         if not task.get('recon_complete') or not task.get('evidence_ready'):
             role, reason = 'WORKHORSE', 'Collect verified facts and a compressed evidence packet first.'
             trigger = 'evidence_packet_required'
@@ -97,7 +102,7 @@ def route(task, roles=None, available_roles=None):
         else:
             role, reason = 'SENIOR', 'Senior planning; narrow any consequential question before frontier delegation.'
     elif task.get('reasoning_depth') == 'deep' or task.get('ambiguity') == 'high':
-        role, reason = 'SENIOR', 'Cross-module reasoning or unresolved ambiguity requires senior execution.'
+        role, reason = 'WORKHORSE', 'Deep repository work stays with a workhorse at higher effort; isolate any judgment question.'
     elif (phase == 'verify' or task.get('repetitive')) and task.get('verifiability') == 'yes' and not consequential:
         role, reason = 'MECHANICAL', 'Deterministic work with known validation.'
     else:
@@ -111,21 +116,26 @@ def route(task, roles=None, available_roles=None):
             return _result('reclassify', 'Do not repeat frontier work without a newly bounded question and evidence.', 'new_evidence_only')
         if previous == 'SENIOR' and role != 'FRONTIER':
             return _result('reclassify', 'Separate a consequential judgment from implementation before escalating.', 'new_consequential_judgment')
+        if previous == 'WORKHORSE' and phase in ('recon', 'implementation', 'verify', 'repair'):
+            return _result('reclassify', 'Isolate a bounded judgment or new evidence; the thin Sol coordinator cannot absorb repository labor.',
+                           'new_consequential_judgment')
         floor = ROLES.index(previous) + 1
         role = ROLES[max(ROLES.index(role), floor)]
         reason = 'Concrete reasoning failure; escalate one tier while preserving the slice.'
         trigger = None
 
     selected = role
-    effort = roles[role]['effort']
+    effort = ('high' if role == 'WORKHORSE' and
+              (task.get('reasoning_depth') == 'deep' or task.get('ambiguity') == 'high')
+              else roles[role]['effort'])
     if role not in available:
         if not task.get('fallback_acceptable', True):
             return _result('blocked', 'Required capability unavailable; fallback cannot satisfy acceptance criteria.', 'capability_available')
         fallbacks = {
             'FRONTIER': [('SENIOR', 'high')],
             'SENIOR': [('FRONTIER', 'low'), ('WORKHORSE', 'high')],
-            'WORKHORSE': [('SENIOR', 'medium')],
-            'MECHANICAL': [('WORKHORSE', 'low'), ('SENIOR', 'low')],
+            'WORKHORSE': [],
+            'MECHANICAL': [('WORKHORSE', 'low')],
         }
         # Even a fallback must not turn frontier into a routine execution worker.
         candidates = [(r, e) for r, e in fallbacks[role]

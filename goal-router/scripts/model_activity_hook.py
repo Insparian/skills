@@ -6,6 +6,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from coordinator_policy import guard_pre_tool, release_failed_start, update_lifecycle
+
 
 SUPPORTED_EVENTS = {'PreToolUse', 'PostToolUse', 'SubagentStart', 'SubagentStop'}
 TOOL_EVENTS = {'PreToolUse', 'PostToolUse'}
@@ -65,18 +67,39 @@ def append_record(path, record):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--log', default='.goal-router/diagnostics/model-activity.jsonl')
+    parser.add_argument('--policy', help='Optional thin-coordinator policy relative to the Git root')
     args = parser.parse_args()
+    output = None
+    payload = {}
     try:
         payload = json.load(sys.stdin)
         if not isinstance(payload, dict):
             raise ValueError('hook input must be a JSON object')
         record = make_record(payload)
         if record is not None:
-            append_record(resolve_log_path(payload.get('cwd', os.getcwd()), args.log), record)
+            root = repository_root(payload.get('cwd', os.getcwd()))
+            append_record(resolve_log_path(root, args.log), record)
+            if args.policy:
+                policy_path = resolve_log_path(root, args.policy)
+                update_lifecycle(payload, policy_path)
+                release_failed_start(payload, policy_path)
+                output = guard_pre_tool(payload, policy_path, root)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         print('Goal Router activity hook failed: ' + str(exc), file=sys.stderr)
+        if (payload.get('hook_event_name') == 'PreToolUse' and args.policy and
+                resolve_log_path(payload.get('cwd', os.getcwd()), args.policy).is_file()):
+            sys.stdout.write(json.dumps({
+                'hookSpecificOutput': {
+                    'hookEventName': 'PreToolUse',
+                    'permissionDecision': 'deny',
+                    'permissionDecisionReason': 'Goal Router coordinator guard failed. Stop and repair the project hook before continuing.',
+                }
+            }, separators=(',', ':')))
+            return 0
         return 1
-    if payload.get('hook_event_name') == 'SubagentStop':
+    if output is not None:
+        sys.stdout.write(json.dumps(output, separators=(',', ':')))
+    elif payload.get('hook_event_name') == 'SubagentStop':
         sys.stdout.write('{}')
     return 0
 

@@ -47,6 +47,7 @@ def run():
                      authorization={'allowed': mission['authorized_actions'], 'forbidden': mission['forbidden_actions']},
                      criteria={c: {'status': 'pending', 'evidence': []} for c in mission['completion_criteria']},
                      monitor={'id': 'simulated-monitor', 'status': 'active', 'interval_minutes': 30}, decisions=[])
+        state['coordinator_guard'] = {'status': 'unavailable', 'policy_path': None}
         evidence = dict(summary='Synthetic repository has release aliasing, leaked secret and empty restore.',
                         verified_facts=[k + ': ' + str(v) for k, v in before.items()],
                         commands=['validate_app: baseline failures reproduced'], critical_files=['app.py'], fingerprint=fingerprint)
@@ -110,6 +111,7 @@ def run():
                     frontier_passes=sum(item['role'] == 'FRONTIER' for item in trace),
                     recovery=recovery, reused_decision=True, monitor_action=shutdown['action'],
                     original_criteria_preserved=True, external_actions=[], offline_ready=True, externally_launched=False,
+                    coordinator_product_tool_calls=0, max_active_workers=1,
                     limitation='Roles, judgment and scheduler responses are simulated; local fixture validation actually ran.')
 
 

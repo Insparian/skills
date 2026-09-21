@@ -4,6 +4,6 @@ Open-source [Codex skills](https://learn.chatgpt.com/docs/build-skills) from Ins
 
 | Skill | Purpose |
 |---|---|
-| [Goal Router](goal-router/README.md) | Route long coding goals across model tiers and resume confirmed quota interruptions with built-in checks. |
+| [Goal Router](goal-router/README.md) | Run long coding goals with a thin Sol coordinator, task-specific workers, and built-in quota recovery checks. |
 
 See each skill's README for installation and usage. Repository content is licensed under MIT unless a skill states otherwise.

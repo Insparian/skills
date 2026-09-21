@@ -2,14 +2,14 @@
 
 | Phase | Default role | Return needed before advancing |
 |---|---|---|
-| Intake | Senior host | Original mission, acceptance IDs, boundaries, canonical state paths, monitor status |
+| Intake | Thin senior host; worker for repository evidence | Original mission, acceptance IDs, boundaries, bounded checkpoint, canonical state paths, monitor and guard status |
 | Recon | Workhorse | Verified map, baselines and command outcomes, gaps, uncertainties, selected critical files |
 | Judgment | Senior; frontier only if justified | Exact decision, evidence dependencies, constraints, risks and stop condition |
 | Implementation | Workhorse | One working outcome, changed paths, validation evidence, unresolved dependencies |
 | Verify | Mechanical/workhorse | Actual command outcomes and artifact checks; falsifiable criterion coverage |
 | Audit | Senior or bounded frontier | BLOCKING/MATERIAL/OPTIONAL findings against supplied evidence |
-| Repair | Workhorse or senior | Corrected behavior and the validation invalidated by the repair |
-| Final | Senior host | Original criterion-by-criterion evidence and any remaining authorization/real-world gap |
+| Repair | Workhorse; high effort for deep debugging | Corrected behavior and the validation invalidated by the repair; bounded senior reasoning may supply a hypothesis only |
+| Final | Worker evidence matrix; thin senior decision | Original criterion-by-criterion evidence and any remaining authorization/real-world gap |
 
 Use slices such as “backup restores the original data” or “public build reads exactly one immutable release.” Avoid slicing solely by file name. Include dependencies, expected paths, forbidden paths, acceptance, validation and a stop condition. One worker should own a mutable slice at a time.
 

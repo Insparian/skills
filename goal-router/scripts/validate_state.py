@@ -63,6 +63,12 @@ def validate_state(state):
         raise ValueError('this version uses a 30-minute recurring heartbeat')
     if monitor['status'] == 'active' and not monitor.get('id'):
         raise ValueError('active monitor requires a confirmed tool-returned ID')
+    guard = state.get('coordinator_guard')
+    if guard is not None:
+        if not isinstance(guard, dict) or guard.get('status') not in ('active', 'unconfirmed', 'unavailable'):
+            raise ValueError('invalid coordinator guard state')
+        if guard.get('policy_path') is not None and not isinstance(guard.get('policy_path'), str):
+            raise ValueError('coordinator guard policy_path must be a string or null')
     if state['status'] == 'completed':
         if any(c['status'] != 'verified' for c in criteria.values()) or state['blockers'] or state['pending_external_actions']:
             raise ValueError('completed requires every criterion verified and no remaining required actions')
@@ -89,7 +95,7 @@ def main():
         read_state(args.state)
     except (ValueError, OSError, TypeError) as exc:
         parser.exit(2, str(exc) + '\n')
-    print('Checkpoint structurally valid; evidence truth and original criteria still require coordinator verification.')
+    print('Checkpoint structurally valid; evidence truth still requires a worker matrix and coordinator decision.')
 
 
 if __name__ == '__main__':

@@ -21,6 +21,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(result['externally_launched'])
         self.assertEqual(result['external_actions'], [])
         self.assertEqual(result['monitor_action'], 'stop_monitor')
+        self.assertEqual(result['coordinator_product_tool_calls'], 0)
+        self.assertEqual(result['max_active_workers'], 1)
 
     def test_large_goal_can_finish_without_frontier(self):
         tasks = [{'phase': 'intake'}, {'phase': 'recon'},
