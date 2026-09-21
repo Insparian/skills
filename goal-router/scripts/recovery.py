@@ -33,7 +33,7 @@ def quota_observation(usage, limit_id, now):
 def decide(state, observation):
     validate_state(state)
     def result(action, reason):
-        return dict(action=action, reason=reason, interval_minutes=10)
+        return dict(action=action, reason=reason, interval_minutes=30)
     for key in ('mission_id', 'thread_id'):
         if observation.get(key) != state[key]:
             return result('needs_attention', 'Task or mission identity mismatch; do not resume another goal.')

@@ -13,8 +13,9 @@ Checked 2026-09-20 against the official documentation and the current desktop to
 | Usage | The tool exposes used percentages and reset timestamps, including short and weekly windows. Missing fields are unknown. Do not assume the same limit bucket for every model or task. |
 | Quota recovery | A recurring schedule can be requested before interruption. Continued recurrence after quota failures and resumption of the real task have NOT been live overnight-tested by this package. Pure tests simulate these events. |
 | Local execution | Requires computer/application running, workspace access and the normal sandbox permissions. Checks themselves may consume quota and inherit lengthy task context. No exact consumption or savings measured. |
+| Hooks diagnostic | Official Codex hooks expose the active model on common event input and support tool-use and subagent lifecycle events. Project-local unmanaged hooks require project trust and review of the exact hook definition. Hosted tools and specialized opt-out paths can be absent, so the diagnostic is useful evidence rather than a complete enforcement boundary. |
 
-The user-authorized ten-minute heartbeat supersedes the original brief's “no automatic background execution” non-goal solely for built-in same-task quota recovery. All other scope, authorization and root-model boundaries remain. The fallback checkpoint is structured `STATE.json` instead of the illustrative `STATE.md`; existing project formats take priority.
+The user-authorized thirty-minute heartbeat supersedes the original brief's “no automatic background execution” non-goal solely for built-in same-task quota recovery. All other scope, authorization and root-model boundaries remain. The fallback checkpoint is structured `STATE.json` instead of the illustrative `STATE.md`; existing project formats take priority.
 
 Helpers use Python 3.9+ standard library only and never connect to a network. TOML parse validation uses Python 3.11+ when available; generation and runtime helper use do not require it. The external skill-creator validator requires PyYAML. During development, PyYAML 6.0.3 was downloaded from PyPI into a temporary validation directory only; it is not bundled, globally installed or a dependency of this skill's runtime.
 
@@ -25,5 +26,6 @@ Helpers use Python 3.9+ standard library only and never connect to a network. TO
 - [Models](https://learn.chatgpt.com/docs/models): current model guidance; runtime availability must still be checked.
 - [Scheduled tasks](https://learn.chatgpt.com/docs/automations?surface=app): in-chat recurrence, skills and local runtime requirements.
 - [App Server usage fields](https://developers.openai.com/zh-Hans/docs/app-server): limit buckets, consumed percentages and reset timestamps.
+- [Hooks](https://learn.chatgpt.com/docs/hooks): lifecycle events, model metadata, tool coverage, project trust and hook review.
 
 No reference-project code was copied. All routing helpers, profiles and tests were written for this specification.

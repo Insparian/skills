@@ -32,7 +32,7 @@ The following is an illustrative valid structure, not a ready-to-run mission. Re
   "criteria": {
     "restore-round-trip": {"status": "pending", "evidence": []}
   },
-  "monitor": {"id": null, "status": "unregistered", "interval_minutes": 10},
+  "monitor": {"id": null, "status": "unregistered", "interval_minutes": 30},
   "decisions": []
 }
 ```

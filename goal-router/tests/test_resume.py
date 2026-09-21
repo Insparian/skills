@@ -19,7 +19,7 @@ def sample_state():
                 blockers=[], pending_external_actions=[],
                 authorization={'allowed': ['local edits', 'offline tests'], 'forbidden': ['deploy', 'push']},
                 criteria={'restore': {'status': 'pending', 'evidence': []}},
-                monitor={'id': 'monitor-a', 'status': 'active', 'interval_minutes': 10},
+                monitor={'id': 'monitor-a', 'status': 'active', 'interval_minutes': 30},
                 decisions=[{'id': 'release-choice', 'evidence_fingerprint': 'abc', 'result_path': 'decision.md'}])
 
 

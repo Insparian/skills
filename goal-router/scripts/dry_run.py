@@ -46,7 +46,7 @@ def run():
                      mission_path='MISSION.json', evidence_path='EVIDENCE.json', blockers=[], pending_external_actions=[],
                      authorization={'allowed': mission['authorized_actions'], 'forbidden': mission['forbidden_actions']},
                      criteria={c: {'status': 'pending', 'evidence': []} for c in mission['completion_criteria']},
-                     monitor={'id': 'simulated-monitor', 'status': 'active', 'interval_minutes': 10}, decisions=[])
+                     monitor={'id': 'simulated-monitor', 'status': 'active', 'interval_minutes': 30}, decisions=[])
         evidence = dict(summary='Synthetic repository has release aliasing, leaked secret and empty restore.',
                         verified_facts=[k + ': ' + str(v) for k, v in before.items()],
                         commands=['validate_app: baseline failures reproduced'], critical_files=['app.py'], fingerprint=fingerprint)

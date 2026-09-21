@@ -21,11 +21,15 @@ Sol coordinates the mission. Terra handles reconnaissance, implementation, and o
 
 ## Recovery after quota exhaustion
 
-At launch, Goal Router requests one built-in recurring check every ten minutes **in the original task**. Sol performs a brief check without spawning a polling agent. Once a quota interruption is confirmed and usable quota returns, it reconciles partial changes and running work before continuing the unfinished slice. It reuses completed evidence and decisions that remain valid.
+At launch, Goal Router requests one built-in recurring check every thirty minutes **in the original task**. Sol performs a brief check without spawning a polling agent. Once a quota interruption is confirmed and usable quota returns, it reconciles partial changes and running work before continuing the unfinished slice. It reuses completed evidence and decisions that remain valid.
 
 The monitor stops after verified completion, a deliberate pause or cancellation, or a blocker requiring your decision or authorization. Unchanged checks stay quiet. Repeated invocation reuses a matching monitor instead of creating another one.
 
-The computer and desktop app must stay running. Checks can consume quota. The ten-minute interval is a schedule, not a recovery-time guarantee; continued scheduling after real quota failure has not yet been tested overnight. A weekly limit can delay work beyond a five-hour window. If the built-in scheduling tool is unavailable, the skill reports that automatic recovery is unavailable and continues foreground work with durable checkpoints.
+The computer and desktop app must stay running. Checks can consume quota. The thirty-minute interval is a schedule, not a recovery-time guarantee; continued scheduling after real quota failure has not yet been tested overnight. A weekly limit can delay work beyond a five-hour window. If the built-in scheduling tool is unavailable, the skill reports that automatic recovery is unavailable and continues foreground work with durable checkpoints.
+
+## Diagnose model ownership
+
+If Sol appears to resume implementation after a worker returns, collect evidence before changing the routing policy. The optional local activity hook records event time, active model, tool identity and subagent start/stop identity. It deliberately excludes commands, patches, tool results, prompts, transcripts and code. See the [model activity diagnostic](references/model-activity-diagnostic.md). Hook installation is explicit and separate from normal skill installation.
 
 ## Install
 
@@ -54,8 +58,8 @@ The installer copies only the skill package and four agent profiles. It does not
 | `SKILL.md` | Concise agent entry point |
 | `config/roles.json` | Single source for the four role-to-model mappings |
 | `codex-agents/` | Four generated custom-agent profiles |
-| `references/` | Routing, phase, context, recovery, and monitoring instructions |
-| `scripts/` | Local routing, state validation, simulation, and installation helpers |
+| `references/` | Routing, phase, context, recovery, monitoring, and diagnostic instructions |
+| `scripts/` | Local routing, state validation, simulation, installation, and optional diagnostic helpers |
 | `tests/` | Routing evaluations and recovery tests |
 | `evaluations/` | Validation evidence and limits |
 

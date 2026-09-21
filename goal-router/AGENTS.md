@@ -10,9 +10,11 @@ Use temporary directories for test outputs; never put mission state or account i
 
 ## Accepted behavior changes
 
-Use the original goal-router specification with one explicit extension: on invocation, use the desktop's built-in recurring heartbeat in the same task every 10 minutes. The root coordinator performs a minimal check; no polling subagent, standalone cron workaround, external scheduler, model switching or quota-reset-credit redemption. Establish the recurring schedule before long work, deduplicate it on resume, and stop it on verified completion or explicit cancellation/pause. Resume only confirmed quota interruptions with permission intact. Existing unknown interruptions require classification, not a guessed quota diagnosis.
+Use the original goal-router specification with one explicit extension: on invocation, use the desktop's built-in recurring heartbeat in the same task every 30 minutes. The root coordinator performs a minimal check; no polling subagent, standalone cron workaround, external scheduler, model switching or quota-reset-credit redemption. Establish the recurring schedule before long work, deduplicate it on resume, and stop it on verified completion or explicit cancellation/pause. Resume only confirmed quota interruptions with permission intact. Existing unknown interruptions require classification, not a guessed quota diagnosis.
 
 Heartbeat creation, failure persistence and post-quota recovery are platform capabilities, not guarantees supplied by this skill. Report unsupported tools or failed schedule creation honestly. Never describe deterministic simulations as an actual overnight recovery test. No new network service or SDK is required; helpers are local and offline. Runtime model work and automation use the user's existing Codex service.
+
+When model ownership is uncertain, the optional project-local diagnostic may record only event time, model, tool name/tool-call identity and subagent lifecycle identity. It must not retain tool input/output, prompts, transcripts, code, assistant messages or environment values. Diagnostics are observational and must not silently change routing or tool permissions. Existing hook configuration requires manual review; never overwrite it.
 
 ## Validation
 

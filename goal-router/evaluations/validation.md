@@ -1,4 +1,4 @@
-# Validation report — 2026-09-20
+# Validation report — 2026-09-21
 
 ## Result
 
@@ -7,7 +7,7 @@ The skill package is implemented under `goal-router/`. No parent spec file, glob
 | Check | Observed result |
 |---|---|
 | Official skill-creator quick_validate.py | `Skill is valid!` |
-| Unit/integration suite | 35 tests passed on Python 3.9.6 |
+| Unit/integration suite | 41 tests passed on Python 3.9.6 |
 | Synthetic routing set | 22 fixtures covering mechanical edits, frontend/backend/mobile, database migration, release, security, refactor, docs, verification, ambiguity and missing prerequisites |
 | Custom profile consistency | Four generated TOML files match config/roles.json and generator output |
 | TOML parser | Four profiles parsed with Python 3.14 tomllib; required schema fields present |
@@ -17,6 +17,7 @@ The skill package is implemented under `goal-router/`. No parent spec file, glob
 | Independent local implementation | Fresh temporary service repaired by evaluator; 4 failures + 1 error before, 5/5 functional tests after; coordinator independently reran the 5 tests successfully |
 | Real quota exhaustion and overnight wake | Not tested |
 | Four-model live dispatch/profile discovery | Not tested; model overrides are documented and advertised by this host, not proven by these offline tests |
+| Model activity diagnostic | Hook logger and no-overwrite installer tested locally; no live Codex hook events captured yet |
 
 ## Reproduce the package checks
 
@@ -40,15 +41,17 @@ These are hypothetical schedules, not measured Codex reset rules. Start at 22:00
 | 300 minutes | 08:00 | 13:00 | 18:00 | 19:00 |
 | 305 minutes | 03:05 | 08:10 | 13:15 | 14:15 |
 | 310 minutes | 03:10 | 08:20 | 13:30 | 14:30 |
-| 10 minutes | 03:10 | 08:10 | 13:10 | 14:10 |
+| 30 minutes | 03:30 | 08:30 | 13:30 | 14:30 |
 
-When the first usable reset is instead 03:12, the 310-minute schedule misses it and resumes at 08:20; the ten-minute schedule resumes at 03:20. When the first post-reset ten-minute tick also fails, the simulated next tick resumes at 03:20, eighteen minutes after 03:02. A weekly block does not resume until its simulated weekly reset. Repeated two-minute shifts across three windows produce eight minutes of extra wait in each ten-minute interval. None of these simulations prove that the app retains a recurring monitor after a quota-related execution failure.
+When the first usable reset is instead 03:12, the 310-minute schedule misses it and resumes at 08:20; the thirty-minute schedule resumes at 03:30. When the first post-reset thirty-minute tick also fails, the simulated next tick resumes at 04:00, fifty-eight minutes after 03:02. A weekly block does not resume until its simulated weekly reset. Repeated two-minute shifts across three windows produce twenty-eight minutes of extra wait in each thirty-minute interval. None of these simulations prove that the app retains a recurring monitor after a quota-related execution failure.
 
 ## Behavioral findings and fixes
 
 The independent evaluator found that senior work could degrade to mechanical when only that role remained. The router now blocks instead; a regression test covers deep unverifiable work with only MECHANICAL available. The short saved heartbeat prompt now explicitly stops on an unclassifiable interruption. The quota normalizer treats a missing window as unknown unless current ordinary-Codex allowance is explicitly returned alongside readable non-exhausted usage; a weekly exhausted window still takes precedence.
 
 Coordinator review also added an explicit `decision_valid` input so a repeated *failed* frontier question cannot be reused as a completed decision. The local synthetic public export was tightened to an explicit text-field schema with nested-field filtering rather than merely dropping a top-level `secret` key. These are fixture behaviors, not a general production secret detector.
+
+The 2026-09-21 diagnostic addition does not alter the routing decision helper. Unit tests verify that activity records omit tool input/output, prompts, transcripts, assistant messages and code; the installer refuses existing hook destinations and configures only the four documented activity events. Live project hook trust and event delivery remain to be tested in the target repository.
 
 ## Independent implementation evidence
 
@@ -60,6 +63,6 @@ The evaluator accidentally displayed the fixture's `fixed_source` during its ini
 
 ## Operational limits to validate in real use
 
-The first actual invocation must verify installed/discoverable profiles or supported explicit overrides, successful same-task ten-minute heartbeat registration, effective task association and returned schedule ID. The accepted behavior is to report degraded/unavailable capability honestly instead of guessing.
+The first actual invocation must verify installed/discoverable profiles or supported explicit overrides, successful same-task thirty-minute heartbeat registration, effective task association and returned schedule ID. The accepted behavior is to report degraded/unavailable capability honestly instead of guessing.
 
 Actual quota exhaustion can prevent the heartbeat itself from executing. The platform's handling of those failed ticks, sleep/wake, queueing behind ongoing work, native goal budgets and eventual resumption remains environment-dependent. Retain checkpoints and inspect the first real overnight cycle. No token savings, negligible polling cost, guaranteed recovery latency or live deployment was measured or claimed.

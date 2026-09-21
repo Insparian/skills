@@ -30,15 +30,15 @@ class WorkflowTests(unittest.TestCase):
 
     def test_three_recoveries_do_not_wait_a_whole_extra_window(self):
         for delay in (2, 12):
-            result = simulate(interval=10, first_reset=300 + delay, later_reset_delay=delay)
+            result = simulate(interval=30, first_reset=300 + delay, later_reset_delay=delay)
             self.assertEqual(len(result['events']), 3)
-            self.assertTrue(all(0 <= event['extra_wait_minutes'] < 10 for event in result['events']))
+            self.assertTrue(all(0 <= event['extra_wait_minutes'] < 30 for event in result['events']))
         result = simulate(interval=300, first_reset=302)
         self.assertEqual(result['events'][0]['extra_wait_minutes'], 298)
 
     def test_failed_tick_does_not_remove_later_simulated_recurrences(self):
-        result = simulate(interval=10, first_reset=302, missed_ticks=(310,))
-        self.assertEqual(result['events'][0]['resumed_at_minute'], 320)
+        result = simulate(interval=30, first_reset=302, missed_ticks=(330,))
+        self.assertEqual(result['events'][0]['resumed_at_minute'], 360)
         self.assertEqual(len(result['events']), 3)
 
     def test_weekly_quota_is_not_a_five_hour_reset(self):

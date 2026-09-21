@@ -59,8 +59,8 @@ def validate_state(state):
     monitor = state.get('monitor')
     if not isinstance(monitor, dict) or monitor.get('status') not in ('unregistered', 'active', 'stopped', 'unavailable'):
         raise ValueError('invalid monitor state')
-    if monitor.get('interval_minutes') != 10:
-        raise ValueError('this version uses a 10-minute recurring heartbeat')
+    if monitor.get('interval_minutes') != 30:
+        raise ValueError('this version uses a 30-minute recurring heartbeat')
     if monitor['status'] == 'active' and not monitor.get('id'):
         raise ValueError('active monitor requires a confirmed tool-returned ID')
     if state['status'] == 'completed':
