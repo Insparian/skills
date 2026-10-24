@@ -76,15 +76,18 @@ def policy_lock(path):
         handle.close()
 
 
-def create_policy(path, checkpoint_paths=None, max_active_workers=1):
+def create_policy(path, checkpoint_paths=None, max_active_workers=1, replace=False):
     if max_active_workers not in (1, 2):
         raise ValueError('max_active_workers must be one or two')
     with policy_lock(path):
+        if Path(path).exists() and not replace:
+            raise FileExistsError('existing coordinator policy requires explicit reviewed replacement')
         value = {
             'schema_version': 1,
             'enabled': True,
-            'coordinator_models': ['gpt-5.6-sol'],
+            'identity_mode': 'session-worker-turns',
             'coordinator_session_id': None,
+            'coordinator_turn_ids': [],
             'max_active_workers': max_active_workers,
             'checkpoint_paths': checkpoint_paths or list(DEFAULT_CHECKPOINTS),
             'frontier_agent_types': ['goal-frontier'],
@@ -168,7 +171,8 @@ def update_lifecycle(payload, policy_path):
         if event == 'SubagentStart':
             if pending:
                 pending.pop(next(iter(pending)), None)
-            active[agent_id] = {'agent_type': payload.get('agent_type'), 'model': payload.get('model')}
+            active[agent_id] = {'agent_type': payload.get('agent_type'), 'model': payload.get('model'),
+                                'turn_id': payload.get('turn_id')}
         else:
             active.pop(agent_id, None)
         policy['last_lifecycle_at'] = utc_now()
@@ -213,18 +217,36 @@ def guard_pre_tool(payload, policy_path, root):
 
 def _guard_pre_tool_locked(payload, path, root):
     policy = read_policy(path)
-    if not policy.get('enabled') or payload.get('model') not in policy.get('coordinator_models', []):
+    if not policy.get('enabled'):
         return None
     session_id = payload.get('session_id')
+    if not isinstance(session_id, str) or not session_id:
+        return _deny('Goal Router cannot establish this task identity. Stop and repair the guard.')
     bound = policy.get('coordinator_session_id')
+    if bound is not None and session_id != bound:
+        return None
+    if policy.get('identity_mode') != 'session-worker-turns':
+        return _deny('Legacy model-based coordinator policy requires explicit review and replacement before execution.')
     if bound is None:
-        if not isinstance(session_id, str) or not session_id:
-            return _deny('Goal Router coordinator guard could not bind this task session. Stop and repair the guard.')
         policy['coordinator_session_id'] = session_id
         policy['bound_at'] = utc_now()
         write_policy(path, policy)
-    elif session_id != bound:
+
+    turn_id = payload.get('turn_id')
+    worker_turns = {item.get('turn_id') for item in policy.get('active_agents', {}).values()
+                    if isinstance(item, dict) and item.get('turn_id')
+                    and item.get('turn_id') not in policy.get('coordinator_turn_ids', [])}
+    # Only lifecycle-confirmed current worker turns receive execution rights.
+    # Missing identity stays restricted; model names never establish ownership.
+    if turn_id and turn_id in worker_turns:
+        worker_tool = payload.get('tool_name')
+        if (worker_tool in SPAWN_TOOLS or worker_tool in FOLLOWUP_TOOLS or
+                isinstance(worker_tool, str) and worker_tool.endswith(('spawn_agent', 'followup_task'))):
+            return _deny('Execution workers must return to the coordinator instead of delegating further.')
         return None
+    if turn_id and turn_id not in policy.setdefault('coordinator_turn_ids', []):
+        policy['coordinator_turn_ids'].append(turn_id)
+        write_policy(path, policy)
 
     tool = payload.get('tool_name')
     tool_input = payload.get('tool_input') if isinstance(payload.get('tool_input'), dict) else {}
@@ -265,23 +287,23 @@ def _guard_pre_tool_locked(payload, path, root):
         write_policy(path, policy)
         return None
     if tool in SHELL_TOOLS:
-        return _deny('Sol is the thin coordinator. Delegate shell work, implementation, repair and verification to a worker.')
+        return _deny('This turn is the coordinator or has unconfirmed worker identity. Delegate shell work, implementation, repair and verification to a worker.')
     if tool in SEARCH_TOOLS:
-        return _deny('Sol is the thin coordinator. Delegate repository search and reconnaissance to a worker.')
+        return _deny('This turn is the coordinator or has unconfirmed worker identity. Delegate repository search and reconnaissance to a worker.')
     if tool in READ_TOOLS:
         paths = _tool_paths(tool, tool_input)
         if paths and all(not _is_policy_path(item, root, path) and
                          _allowed_path(item, Path(root), policy.get('checkpoint_paths', []))
                          for item in paths):
             return None
-        return _deny('Sol may read only approved Goal Router checkpoint files after guard activation.')
+        return _deny('The coordinator may read only approved Goal Router checkpoint files after guard activation.')
     if tool in WRITE_TOOLS:
         paths = _tool_paths(tool, tool_input)
         if paths and all(not _is_policy_path(item, root, path) and
                          _allowed_path(item, Path(root), policy.get('checkpoint_paths', []))
                          for item in paths):
             return None
-        return _deny('Sol may edit only approved Goal Router checkpoint files. Delegate product-file changes to a worker.')
+        return _deny('The coordinator may edit only approved Goal Router checkpoint files. Delegate product-file changes to a worker.')
     return None
 
 
@@ -292,6 +314,7 @@ def main():
     init.add_argument('--policy', default='.goal-router/coordinator-policy.json')
     init.add_argument('--checkpoint', action='append', dest='checkpoints')
     init.add_argument('--max-active-workers', type=int, default=1)
+    init.add_argument('--replace-reviewed', action='store_true', help='Replace an existing policy only after explicit review')
     args = parser.parse_args()
     if args.command == 'init':
         policy = Path(args.policy)
@@ -302,7 +325,10 @@ def main():
             if git_root is None:
                 parser.exit(2, 'relative policy path requires a Git working tree\n')
             policy = git_root / policy
-        create_policy(policy, args.checkpoints, args.max_active_workers)
+        try:
+            create_policy(policy, args.checkpoints, args.max_active_workers, replace=args.replace_reviewed)
+        except (OSError, ValueError) as exc:
+            parser.exit(2, str(exc) + '\n')
         print('Coordinator policy initialized at ' + str(policy))
 
 

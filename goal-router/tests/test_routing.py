@@ -1,4 +1,6 @@
 import json
+import subprocess
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -42,8 +44,8 @@ class RoutingTests(unittest.TestCase):
 
     def test_root_guard(self):
         self.assertEqual(root_guard('gpt-6-astra')['action'], 'switch_required')
-        self.assertEqual(root_guard(None)['action'], 'continue_assumed')
-        self.assertEqual(root_guard('gpt-5.6-sol')['action'], 'continue')
+        self.assertEqual(root_guard(None)['action'], 'confirm_required')
+        self.assertEqual(root_guard('gpt-5.6-sol', actual_effort='medium', source='runtime')['action'], 'ready')
 
     def test_mapping_is_external(self):
         roles = load_roles()
@@ -59,25 +61,24 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result['action'], 'blocked')
         self.assertIsNone(result['role'])
 
-    def test_deep_repository_work_uses_high_effort_workhorse(self):
+    def test_deep_repository_work_uses_senior_execution_owner(self):
         result = route({'phase': 'repair', 'reasoning_depth': 'deep'})
-        self.assertEqual((result['role'], result['reasoning_effort']), ('WORKHORSE', 'high'))
+        self.assertEqual((result['role'], result['reasoning_effort']), ('SENIOR', 'medium'))
 
     def test_intake_and_final_are_coordinator_actions(self):
         for phase in ('intake', 'final'):
             result = route({'phase': phase})
             self.assertEqual((result['action'], result['role']), ('coordinate', 'SENIOR'))
 
-    def test_worker_failure_becomes_bounded_judgment_not_sol_implementation(self):
+    def test_worker_reasoning_failure_uses_senior_executor(self):
         result = route({'phase': 'repair', 'previous_role': 'WORKHORSE',
                         'attempts_without_progress': 2, 'reasoning_failure': True})
-        self.assertEqual(result['action'], 'reclassify')
-        self.assertIsNone(result['role'])
+        self.assertEqual((result['action'], result['role']), ('delegate', 'SENIOR'))
 
-    def test_mechanical_verification_never_falls_back_to_sol(self):
+    def test_mechanical_verification_can_fall_back_to_senior(self):
         result = route({'phase': 'verify', 'verifiability': 'yes'}, available_roles=['SENIOR'])
-        self.assertEqual(result['action'], 'blocked')
-        self.assertIsNone(result['role'])
+        self.assertEqual((result['role'], result['reasoning_effort']), ('SENIOR', 'low'))
+        self.assertTrue(result['degraded'])
 
     def test_no_frontier_for_volume_or_coding(self):
         for phase in ('recon', 'implementation', 'verify', 'repair'):
@@ -105,6 +106,47 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(route(task)['action'], 'reclassify')
         task['extra_pass_justified'] = True
         self.assertEqual(route(task)['role'], 'FRONTIER')
+
+    def test_launch_requires_effort_and_provenance(self):
+        self.assertEqual(root_guard('gpt-5.6-sol')['action'], 'confirm_required')
+        self.assertEqual(root_guard('gpt-5.6-sol', actual_effort='high', source='runtime')['action'], 'confirm_required')
+        result = root_guard(None, allow_unverified=True)
+        self.assertEqual(result['action'], 'ready_unverified')
+        self.assertFalse(result['verified'])
+
+    def test_cli_gates_before_routing_and_accepts_confirmed_launch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            task = Path(temp) / 'task.json'
+            launch = Path(temp) / 'launch.json'
+            task.write_text(json.dumps({'phase': 'implementation'}))
+            base = [sys.executable, str(ROOT / 'scripts/route.py'), str(task)]
+            result = subprocess.run(base, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(result.stdout)['action'], 'confirm_required')
+            launch.write_text(json.dumps({'model': 'gpt-5.6-sol', 'effort': 'medium', 'source': 'user'}))
+            result = subprocess.run(base + ['--launch', str(launch)], capture_output=True, text=True, check=True)
+            output = json.loads(result.stdout)
+            self.assertEqual(output['action'], 'delegate')
+            self.assertEqual(output['launch']['action'], 'ready')
+            self.assertIsNone(output['launch']['quota_bucket'])
+
+    def test_interacting_state_invariants_select_senior(self):
+        result = route({'phase': 'implementation', 'state_invariants': True})
+        self.assertEqual(result['role'], 'SENIOR')
+
+    def test_worker_unavailable_has_capable_senior_fallback(self):
+        result = route({'phase': 'implementation'}, available_roles=['SENIOR'])
+        self.assertEqual(result['role'], 'SENIOR')
+        self.assertTrue(result['degraded'])
+
+    def test_existing_owner_keeps_verification_and_ordinary_repairs(self):
+        for phase in ('verify', 'repair'):
+            for owner in ('WORKHORSE', 'SENIOR'):
+                result = route({'phase': phase, 'verifiability': 'yes', 'owner_role': owner})
+                self.assertEqual(result['role'], owner)
+        result = route({'phase': 'repair', 'owner_role': 'WORKHORSE', 'state_invariants': True})
+        self.assertEqual(result['role'], 'SENIOR')
+        with self.assertRaises(ValueError):
+            route({'phase': 'repair', 'owner_role': 'FRONTIER'})
 
     def test_bad_inputs_do_not_silently_route(self):
         for task in ({'phase': 'deploy'}, {'phase': 'audit', 'security_sensitive': 'false'},

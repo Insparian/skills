@@ -1,31 +1,21 @@
-# Thin coordinator boundary
+# Coordinator responsibility
 
-Sol owns mission authority, not repository labor. Keep it in this state machine:
+The coordinator owns mission authority, compact state, route selection and acceptance. A SENIOR executor may use the same model while doing repository labor. Treat these as distinct responsibilities:
 
-1. **BOOTSTRAP:** Read the approved brief, applicable project rules and one compact checkpoint. Do not read full progress history, raw logs, broad diffs or product source. If the checkpoint is missing or stale, delegate its reconstruction and repository mapping to WORKHORSE.
-2. **ROUTE:** Select one outcome slice from a bounded worker packet. The worker proposes dependencies and next slices; Sol preserves authorization and chooses among them. A deterministic route helper may be run before guard activation or by MECHANICAL.
-3. **DISPATCH:** Start one worker with a bounded capsule. Default `max_active_workers` is one. A value of two requires an explicit user preference for wall-clock speed, demonstrably independent slices, no FRONTIER worker, and at most one writer.
-4. **WAIT:** Use collaboration status/wait operations. Do not scan, implement, test or create overlapping work while a worker is active.
-5. **INTEGRATE:** Consume the worker's changed-path list, command result summaries, evidence references and unresolved dependencies. Update only canonical checkpoint/blocker files. Do not reopen product files, rerun tests or repair the returned work. Missing evidence becomes another slice.
-6. **GATE:** Ask MECHANICAL or WORKHORSE for a criterion-to-evidence matrix. Sol compares that bounded matrix with the original criteria and records completed, incomplete, blocked or awaiting-authorization status. It does not execute the validation itself.
+- Bootstrap from the approved brief, project rules and one compact checkpoint. Delegate missing state reconstruction and repository mapping rather than loading full history or source.
+- Run the launch helper before activating the guard. Later route/accounting helpers belong to the current worker and return in its evidence packet; no helper-only worker is required.
+- Choose a cohesive outcome from worker evidence. Dispatch one owner with original boundaries and verification criteria.
+- Wait through interruptible collaboration operations. Prefer the longest practical wait the host permits and batch worker reports at decisions or outcomes. Preserve required user updates; do not manufacture repeated short waits merely to narrate progress.
+- Integrate changed paths, validation summaries, criterion coverage and dependencies. Update canonical checkpoint files only. Missing evidence goes back to the owner.
+- Compare the final evidence matrix with every original criterion. Consequential independent review is conditional; routine owner-run validation does not require another worker.
 
-Ownership means Sol decides what evidence is sufficient and keeps permissions intact. It does not mean Sol independently reproduces the worker's work.
+The checkpoint and worker packets each have a 12,000-character ceiling. Keep current mission identity, criteria, boundaries, verified slices, next outcome, blockers, launch record, monitor/guard status and key decisions. Historical narrative remains in project documents. Never truncate away restrictions or acceptance criteria to satisfy a size limit.
 
-## Context limits
+Default to one active worker. A second requires an explicit user speed preference, independent outcomes, no FRONTIER and at most one writer. FRONTIER is exclusive. The one-writer rule remains a routing responsibility because arbitrary tool metadata does not establish write intent.
 
-The compact checkpoint should fit within 12,000 characters and contain only the current mission identity, original criterion IDs, boundaries, completed slices with evidence references, current slice, next proposed slices, blockers, monitor status and significant decisions. Historical narrative stays in project documents and is read by a worker only when needed. Never print a long progress file into Sol merely to find its latest state. Prefer `scripts/validate_state.py` extraction when the project embeds a `goal-router-state` block.
+## Optional session guard
 
-Worker returns use the same 12,000-character ceiling as delegation capsules. Return summaries and artifact references, not raw test output or source dumps. A failed or incomplete return stays incomplete; Sol does not fill the gap from memory.
-
-## Worker concurrency
-
-One active worker is the quota-conserving default. Parallel work reduces wall-clock time but duplicates context and can spend quota faster. A second worker is an explicit speed tradeoff, never an automatic optimization. Only one worker may modify files at a time. Read-only/mechanical work may overlap one writer only when paths and prerequisites are independent. FRONTIER is exclusive: wait for all other workers to stop before starting it, and start nothing else until it returns.
-
-## Optional tool guard
-
-The project-local Hook installed by `scripts/install_activity_hook.py` can also enforce the coordinator boundary. Choose a policy path allowed by the target repository. Use its documented local runtime directory when one exists; otherwise use `.goal-router/coordinator-policy.json` after establishing that fallback convention.
-
-After BOOTSTRAP and before repository work, initialize the marker once with the installed skill helper. Replace paths with the target project's canonical checkpoint files:
+After bounded intake and before the first worker, initialize the reviewed project-local hook's policy using permitted local state paths. This is separate from skill installation. Review existing hooks and policies before replacement. The initializer refuses an existing policy; `--replace-reviewed` permits replacement only after that review and required user authorization. Existing hooks remain untouched.
 
 ```bash
 /usr/bin/python3 "$(git rev-parse --show-toplevel)/.codex/hooks/coordinator_policy.py" init \
@@ -34,8 +24,12 @@ After BOOTSTRAP and before repository work, initialize the marker once with the 
   --checkpoint docs/BLOCKED.md
 ```
 
-The helper resolves relative policy paths from the Git root even when invoked from a subdirectory. The next Sol tool event binds the policy to the current Codex task session. Later foreground and scheduled turns in that task stay covered without reinitialization, while another task session is not affected by the stale marker. Every Sol turn in the protected task, including a SENIOR subagent, remains tool-thin: shell execution and repository search are blocked, and file reads and writes are restricted to the checkpoint allowlist. Non-Sol workers remain available. The guard also enforces the configured active-worker count and keeps FRONTIER exclusive.
+The next covered tool event binds the original task's `session_id` regardless of model. It must be a coordinator event before dispatch, not a preexisting worker event. Later coordinator turns in that session remain restricted after model changes. Other task sessions are unaffected. Covered coordinator shell/search calls are denied; file operations are limited to the approved checkpoints. The guard does not modify launch settings.
 
-Initialize with `--max-active-workers 2` only after the user explicitly chooses the speed tradeoff and the second slice meets every concurrency condition above. The guard permits a second parallel worker only through a typed spawn whose role/model it can inspect; it does not wake a second existing worker through `followup_task` while one is active. The one-writer rule remains a routing rule because Hook inputs do not establish whether an arbitrary worker will write.
+A `SubagentStart` event supplies the worker identity and active `turn_id`. Only a current worker turn matched to that lifecycle metadata is exempt from coordinator file restrictions. Sol execution workers therefore have the same rights as Terra execution workers. Stop removes the exemption. A model name alone never grants execution rights. Worker prompts still restrict scope and prohibit further delegation; the hook is not a worker sandbox.
 
-Hook coverage has documented exceptions. The policy is defense in depth around the state machine, not proof that every tool path is blocked. Project-local unmanaged hooks also require trust. Report the guard as `active`, `unconfirmed` or `unavailable`; never claim `active` merely because a marker file exists.
+This identity correlation must be checked in the actual host before claiming enforcement. The documented lifecycle and tool fields do not guarantee every follow-up turn gets a new identifying event. Missing worker turn identity remains restricted; do not guess from the model or use undocumented transcript paths to infer it. If a host cannot correlate a legitimate worker turn, report the guard as unconfirmed/unavailable and use the documented routing boundary with user-visible limits. Do not silently disable an already active guard to make work proceed. Legacy model-based policies require explicit review and replacement; no automatic migration is performed.
+
+The guard reserves starts, tracks worker lifecycle, enforces the worker ceiling and keeps FRONTIER exclusive for coordinator dispatch. Use `--max-active-workers 2` only with the approved speed tradeoff. A second existing worker cannot be woken with follow-up while one is active; use a typed spawn for the approved independent slice.
+
+Report `active`, `unconfirmed` or `unavailable` from actual hook trust, coverage and identity evidence. A marker alone proves none of these. Hosted tools, specialized opt-outs and missing lifecycle events limit coverage. See [compatibility.md](compatibility.md). No commands, tool payloads or source are retained in the activity log.

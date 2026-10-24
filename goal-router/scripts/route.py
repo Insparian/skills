@@ -15,11 +15,12 @@ ENUMS = {
     'blast_radius': ('low', 'medium', 'high'),
     'ambiguity': ('low', 'medium', 'high'),
     'previous_role': ROLES,
+    'owner_role': ROLES[:-1],
     'blocked_by': ('authorization', 'credential', 'network', 'service', 'product_decision', 'real_data', 'environment'),
 }
 BOOLS = ('security_sensitive', 'release_sensitive', 'repetitive', 'recon_complete',
          'evidence_ready', 'bounded_question', 'senior_unresolved', 'reasoning_failure',
-         'fallback_acceptable', 'same_question', 'new_evidence', 'extra_pass_justified', 'decision_valid')
+         'fallback_acceptable', 'same_question', 'new_evidence', 'extra_pass_justified', 'decision_valid', 'state_invariants')
 COUNTS = ('attempts_without_progress', 'frontier_passes')
 
 
@@ -35,13 +36,31 @@ def load_roles(path=None):
     return roles
 
 
-def root_guard(actual_model, roles=None):
+def root_guard(actual_model, roles=None, actual_effort=None, source=None,
+               quota_bucket=None, allow_unverified=False):
+    """Assess supplied launch evidence; never discover or change the host model."""
     roles = roles or load_roles()
-    if actual_model is None:
-        return dict(action='continue_assumed', reason='Root model is not exposed; assume recommended launch, do not claim detection.')
-    if actual_model == roles['FRONTIER']['model']:
-        return dict(action='switch_required', reason='Switch the current task to SENIOR / Medium before repository work.')
-    return dict(action='continue', reason='No detectable frontier root; preserve the current task model.')
+    if type(allow_unverified) is not bool:
+        raise ValueError('allow_unverified must reflect an explicit user choice')
+    for label, value in (('model', actual_model), ('effort', actual_effort), ('quota_bucket', quota_bucket)):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError(label + ' must be a nonempty string or null')
+    if source not in (None, 'runtime', 'user'):
+        raise ValueError('launch source must be runtime, user or null')
+    verified = (source in ('runtime', 'user') and
+                actual_model == roles['SENIOR']['model'] and
+                actual_effort == roles['SENIOR']['effort'])
+    if verified:
+        action, reason = 'ready', 'Coordinator model and effort match the configured launch recommendation.'
+    elif allow_unverified:
+        action, reason = 'ready_unverified', 'User explicitly accepted this unverified or non-recommended launch; savings are unverified.'
+    elif actual_model == roles['FRONTIER']['model']:
+        action, reason = 'switch_required', 'Ask the user to select the recommended coordinator before long execution.'
+    else:
+        action, reason = 'confirm_required', 'Confirm the current coordinator model and effort once, or obtain an explicit choice to proceed unverified.'
+    return dict(action=action, verified=verified, model=actual_model, effort=actual_effort,
+                source=source, quota_bucket=quota_bucket, reason=reason,
+                savings_verified=False)
 
 
 def _validate(task):
@@ -101,12 +120,16 @@ def route(task, roles=None, available_roles=None):
             role, reason = 'FRONTIER', 'Bounded consequential judgment supported by reconnaissance.'
         else:
             role, reason = 'SENIOR', 'Senior planning; narrow any consequential question before frontier delegation.'
-    elif task.get('reasoning_depth') == 'deep' or task.get('ambiguity') == 'high':
-        role, reason = 'WORKHORSE', 'Deep repository work stays with a workhorse at higher effort; isolate any judgment question.'
+    elif task.get('reasoning_depth') == 'deep' or task.get('ambiguity') == 'high' or task.get('state_invariants'):
+        role, reason = 'SENIOR', 'Use a capable execution owner for deep reasoning or interacting state invariants; establish counterexamples before implementation.'
     elif (phase == 'verify' or task.get('repetitive')) and task.get('verifiability') == 'yes' and not consequential:
         role, reason = 'MECHANICAL', 'Deterministic work with known validation.'
     else:
         role, reason = 'WORKHORSE', 'Bounded reconnaissance, implementation or ordinary repair.'
+
+    owner = task.get('owner_role')
+    if owner and phase in ('implementation', 'verify', 'repair') and ROLES.index(owner) >= ROLES.index(role):
+        role, reason = owner, 'Keep the existing execution owner for implementation, targeted verification and ordinary repair.'
 
     if task.get('attempts_without_progress', 0) >= 2:
         previous = task.get('previous_role')
@@ -116,12 +139,12 @@ def route(task, roles=None, available_roles=None):
             return _result('reclassify', 'Do not repeat frontier work without a newly bounded question and evidence.', 'new_evidence_only')
         if previous == 'SENIOR' and role != 'FRONTIER':
             return _result('reclassify', 'Separate a consequential judgment from implementation before escalating.', 'new_consequential_judgment')
-        if previous == 'WORKHORSE' and phase in ('recon', 'implementation', 'verify', 'repair'):
-            return _result('reclassify', 'Isolate a bounded judgment or new evidence; the thin Sol coordinator cannot absorb repository labor.',
-                           'new_consequential_judgment')
-        floor = ROLES.index(previous) + 1
-        role = ROLES[max(ROLES.index(role), floor)]
-        reason = 'Concrete reasoning failure; escalate one tier while preserving the slice.'
+        if previous == 'WORKHORSE':
+            role = 'SENIOR'
+        else:
+            floor = ROLES.index(previous) + 1
+            role = ROLES[max(ROLES.index(role), floor)]
+        reason = 'Concrete reasoning failure; escalate one tier while preserving the slice and validation.'
         trigger = None
 
     selected = role
@@ -134,8 +157,8 @@ def route(task, roles=None, available_roles=None):
         fallbacks = {
             'FRONTIER': [('SENIOR', 'high')],
             'SENIOR': [('FRONTIER', 'low'), ('WORKHORSE', 'high')],
-            'WORKHORSE': [],
-            'MECHANICAL': [('WORKHORSE', 'low')],
+            'WORKHORSE': [('SENIOR', 'medium')],
+            'MECHANICAL': [('WORKHORSE', 'low'), ('SENIOR', 'low')],
         }
         # Even a fallback must not turn frontier into a routine execution worker.
         candidates = [(r, e) for r, e in fallbacks[role]
@@ -148,7 +171,9 @@ def route(task, roles=None, available_roles=None):
         role, effort = candidates[0]
         reason += ' Degraded from ' + selected + '; capability is not equivalent.'
     if not trigger:
-        trigger = {'FRONTIER': 'new_evidence_only', 'SENIOR': 'new_consequential_judgment'}.get(role, 'concrete_reasoning_failure')
+        trigger = ('new_evidence_only' if role == 'FRONTIER' else
+                   'new_consequential_judgment' if phase in ('judgment', 'audit') and role == 'SENIOR'
+                   else 'concrete_reasoning_failure')
     result = _result('delegate', reason, trigger, role)
     result.update(preferred_model=roles[role]['model'], reasoning_effort=effort,
                   profile=roles[role]['profile'], degraded=selected != role,
@@ -160,10 +185,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path, help='JSON routing features')
     parser.add_argument('--roles', type=Path)
+    parser.add_argument('--launch', type=Path, help='Current model/effort evidence JSON; missing evidence gates dispatch')
     parser.add_argument('--available', nargs='*', choices=ROLES, default=None)
     args = parser.parse_args()
     try:
-        print(json.dumps(route(json.loads(args.input.read_text()), load_roles(args.roles), args.available), indent=2))
+        roles = load_roles(args.roles)
+        evidence = json.loads(args.launch.read_text()) if args.launch else {}
+        allowed = {'model', 'effort', 'source', 'quota_bucket', 'allow_unverified'}
+        if not isinstance(evidence, dict) or set(evidence) - allowed:
+            raise ValueError('invalid launch evidence fields')
+        launch = root_guard(evidence.get('model'), roles, evidence.get('effort'), evidence.get('source'),
+                            evidence.get('quota_bucket'), evidence.get('allow_unverified', False))
+        if launch['action'] not in ('ready', 'ready_unverified'):
+            print(json.dumps(dict(launch, role=None), indent=2))
+            return
+        result = route(json.loads(args.input.read_text()), roles, args.available)
+        result['launch'] = launch
+        print(json.dumps(result, indent=2))
     except (ValueError, OSError) as exc:
         parser.exit(2, str(exc) + '\n')
 

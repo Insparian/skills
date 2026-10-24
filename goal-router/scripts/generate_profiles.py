@@ -14,14 +14,16 @@ INSTRUCTIONS = {
         'Stop when the requested judgment is complete.'),
     'SENIOR': (
         'Bounded cross-module reasoning, causal debugging and integration.',
-        'Handle the assigned reasoning or integration slice. Preserve the original goal and verification standard. '
+        'Own the assigned reasoning or cohesive implementation slice through targeted verification and ordinary repair. '
+        'For interacting identity, provenance or state transitions, establish invariants and counterexamples before implementation. '
+        'Preserve the original goal and verification standard. '
         'Separate missing prerequisites from reasoning failures. Return changed paths, validation evidence, '
         'remaining uncertainty and the next dependency. Do not establish another coordinator or monitoring loop.'),
     'WORKHORSE': (
         'Repository reconnaissance, bounded implementation and ordinary repair.',
         'Implement only the assigned outcome slice and run its specified validation. For reconnaissance, return '
         'verified facts, command results, gaps, critical files and unresolved decisions as a concise evidence packet. '
-        'For implementation, return changed paths, evidence, unresolved issues and the next dependency. '
+        'For implementation, own targeted verification and ordinary repairs; return changed paths, evidence, unresolved issues and the next dependency. '
         'Stop to report a concrete blocker rather than guessing product decisions.'),
     'MECHANICAL': (
         'Deterministic edits, inventories and known validation commands.',
@@ -34,6 +36,7 @@ SHARED = ('The capsule defines your mission excerpt, allowed actions, forbidden 
           'Do not expand scope, change completion criteria, deploy, push, upload data or perform an external action '
           'unless that exact action is already authorized. Follow applicable project instructions. '
           'Use only the supplied slice context; request a missing fact instead of redoing completed analysis. '
+          'Batch updates at required decisions, concrete blockers or completed outcomes. '
           'Stop at the capsule stop condition. Do not delegate further or create scheduled tasks.')
 
 

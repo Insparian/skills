@@ -2,7 +2,7 @@
 
 A large autonomous coding goal can exhaust a frontier-model quota while the model is still scanning files, running tests, and making routine edits.
 
-**Goal Router keeps one complete goal and assigns each phase to a suitable model role.** It preserves the original acceptance criteria and authorization boundaries. A goal can finish with zero Astra calls.
+**Goal Router keeps one complete goal and chooses an execution owner for cohesive outcomes.** It preserves the original acceptance criteria and authorization boundaries. A goal can finish with zero Astra calls.
 
 ## Quick start
 
@@ -17,7 +17,9 @@ Carry out the following project brief. Preserve its acceptance criteria and auth
 [paste the full brief]
 ```
 
-Sol is a thin coordinator: it preserves authorization, chooses bounded slices, keeps the compact checkpoint, and makes the final criterion decision from worker evidence. Terra handles repository mapping, implementation, and ordinary repairs. Luna handles verifiable mechanical work. Astra handles bounded consequential decisions or audits when the evidence justifies them. The skill does not change the root model. If the runtime reliably identifies Astra as the root, the skill asks you to switch to Sol before repository work begins.
+The coordinator preserves authorization, chooses bounded outcomes, keeps the compact checkpoint and makes the final criterion decision. Its model and effort must be confirmed from current runtime evidence or your model selection before long execution; an unknown model is not assumed to be Sol. You can explicitly choose to proceed unverified, which is reported without a savings claim. The skill never switches the root model itself.
+
+Terra handles ordinary repository work. Sol can directly own deep/ambiguous implementation or interacting identity, provenance and state-transition logic. The same execution owner implements, runs targeted validation and repairs its slice. Luna is available for separate deterministic work. Astra handles bounded consequential judgment or independent review when evidence justifies it. This optimizes total accepted-outcome cost, including coordination and rework, rather than choosing the cheapest model for every first attempt.
 
 Goal Router starts one worker by default. A second worker is allowed only when the user explicitly prioritizes wall-clock speed, both slices are independent, at most one writes, and neither is Astra. Astra always runs alone. See the [thin coordinator boundary](references/coordinator-boundary.md).
 
@@ -31,7 +33,7 @@ The computer and desktop app must stay running. Checks can consume quota. The th
 
 ## Enforce and diagnose model ownership
 
-The optional project-local hook has two roles. Its activity log records event time, active model, tool identity and subagent start/stop identity while excluding commands, patches, tool results, prompts, transcripts and code. When Goal Router creates a policy marker, the same hook binds to the original task session, keeps every Sol turn tool-thin, limits file access to the checkpoint allowlist, and enforces the configured worker ceiling. See the [model activity diagnostic](references/model-activity-diagnostic.md). Hook installation is explicit and separate from normal skill installation; missing or untrusted hook support is reported as degraded enforcement.
+The optional project-local hook has two roles. Its activity log records event time, active model, tool identity and subagent start/stop identity while excluding commands, patches, tool results, prompts, transcripts and code. When Goal Router creates a policy marker, the same hook binds to the original task session, restricts the coordinator regardless of model, exempts only lifecycle-confirmed worker turns, limits coordinator file access to the checkpoint allowlist, and enforces the configured worker ceiling. Worker-turn correlation must be verified in the actual host, including follow-up turns. See the [model activity diagnostic](references/model-activity-diagnostic.md). Hook installation is explicit and separate from normal skill installation; missing or untrusted hook support is reported as degraded enforcement.
 
 ## Install
 
@@ -62,7 +64,7 @@ The installer copies only the skill package and four agent profiles. It does not
 | `codex-agents/` | Four generated custom-agent profiles |
 | `references/` | Coordinator boundary, routing, phase, context, recovery, monitoring, and diagnostic instructions |
 | `scripts/` | Local routing, state validation, simulation, installation, and optional hook/guard helpers |
-| `tests/` | Routing evaluations and recovery tests |
+| `tests/` | Launch, routing, role ownership, accounting and recovery tests |
 | `evaluations/` | Validation evidence and limits |
 
 After changing the model mapping, run `python3 scripts/generate_profiles.py` and update installed copies as appropriate. If Astra is unavailable, the preferred fallback is Sol / High. If a fallback cannot meet the acceptance criteria, the mission remains blocked. A degraded route is never reported as equivalent, and quota savings are not invented.
@@ -78,8 +80,12 @@ python3 -B scripts/dry_run.py
 python3 -B scripts/simulate_checks.py
 ```
 
-The tests include 22 synthetic routing goals, authorization boundaries, thin-coordinator tool ownership, worker concurrency, context compression, interruption recovery, and a synthetic workflow using local files. The simulations do not invoke models or create live automations. Passing them does not prove real platform recovery. See [validation results](evaluations/validation.md) and [compatibility notes](references/compatibility.md).
+The tests include synthetic routing goals, launch gating, authorization boundaries, role-based coordinator ownership, worker concurrency, context compression, usage arithmetic, interruption recovery and a synthetic workflow using local files. The simulations do not invoke models or create live automations. Passing them does not prove real platform recovery. See [current validation results](evaluations/2026-10-24-completion-cost.md) and [historical evidence](evaluations/validation.md) and [compatibility notes](references/compatibility.md).
 
 Progress uses the target project's existing files when available. Otherwise, the skill establishes a `.goal-router/` directory in that project. Model calls and scheduled checks use the user's existing Codex service. Local helper scripts make no network requests or telemetry calls.
 
-MIT licensed. Actual quota savings and overnight recovery have not been measured.
+## Measure completion cost
+
+Use [launch and routing guidance](references/routing-policy.md) for the gated CLI and [completion-cost measurement](references/completion-cost.md) for allowlisted local per-turn usage exports. `scripts/usage.py` deduplicates observations, reports cached and uncached input separately, and compares only matching verified outcomes. It never turns unweighted tokens into subscription savings. Runtime samples remain in the target project's ignored local state; no network or telemetry service is added.
+
+MIT licensed. Real savings still require matched live runs. Historical simulations and passing helper tests do not establish that the routed approach costs less than one execution owner.

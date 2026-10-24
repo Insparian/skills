@@ -5,7 +5,7 @@ import runpy
 import tempfile
 from pathlib import Path
 from capsule import build_capsule
-from route import route, ROOT
+from route import route, root_guard, ROOT
 from recovery import decide
 from validate_state import read_state, validate_state
 
@@ -31,6 +31,8 @@ def validate_app(path):
 def run():
     mission = json.loads((ROOT / 'tests/fixtures/launch_goal.json').read_text())
     trace = []
+    launch = root_guard('gpt-5.6-sol', actual_effort='medium', source='user')
+    assert launch['action'] == 'ready'  # Simulated launch evidence, not actual model discovery.
     with tempfile.TemporaryDirectory(prefix='goal-router-eval-') as temp:
         project = Path(temp)
         (project / 'AGENTS.md').write_text('Synthetic offline evaluation. app.py is the local fixture. '
@@ -93,7 +95,7 @@ def run():
         reuse = route({'phase': 'judgment', 'same_question': True, 'new_evidence': False, 'decision_valid': True})
         assert reuse['action'] == 'reuse'
         # Reconciliation validates the already-written file instead of reapplying a mutation.
-        record({'phase': 'verify', 'verifiability': 'yes'})
+        record({'phase': 'verify', 'verifiability': 'yes', 'owner_role': 'WORKHORSE'})
         after = validate_app(app)
         (project / 'EVIDENCE.json').write_text(json.dumps({'before': before, 'after': after}))
         assert all(after.values())
@@ -107,7 +109,7 @@ def run():
         shutdown = decide(restored, observation)
         assert shutdown['action'] == 'stop_monitor'
         restored['monitor']['status'] = 'stopped'  # Simulated successful automation response, not a live tool call.
-        return dict(simulation_only=True, baseline=before, final_validation=after, trace=trace,
+        return dict(simulation_only=True, launch=launch, baseline=before, final_validation=after, trace=trace,
                     frontier_passes=sum(item['role'] == 'FRONTIER' for item in trace),
                     recovery=recovery, reused_decision=True, monitor_action=shutdown['action'],
                     original_criteria_preserved=True, external_actions=[], offline_ready=True, externally_launched=False,

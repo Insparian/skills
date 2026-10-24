@@ -5,13 +5,13 @@
 | Intake | Thin senior host; worker for repository evidence | Original mission, acceptance IDs, boundaries, bounded checkpoint, canonical state paths, monitor and guard status |
 | Recon | Workhorse | Verified map, baselines and command outcomes, gaps, uncertainties, selected critical files |
 | Judgment | Senior; frontier only if justified | Exact decision, evidence dependencies, constraints, risks and stop condition |
-| Implementation | Workhorse | One working outcome, changed paths, validation evidence, unresolved dependencies |
-| Verify | Mechanical/workhorse | Actual command outcomes and artifact checks; falsifiable criterion coverage |
+| Implementation | Workhorse or senior execution owner | One working outcome, changed paths, validation evidence, unresolved dependencies |
+| Verify | Existing execution owner; mechanical for a separate deterministic slice | Actual command outcomes and artifact checks; falsifiable criterion coverage |
 | Audit | Senior or bounded frontier | BLOCKING/MATERIAL/OPTIONAL findings against supplied evidence |
-| Repair | Workhorse; high effort for deep debugging | Corrected behavior and the validation invalidated by the repair; bounded senior reasoning may supply a hypothesis only |
+| Repair | Existing execution owner; senior for concrete reasoning failure | Corrected behavior, invariant/counterexample evidence and the validation invalidated by the repair |
 | Final | Worker evidence matrix; thin senior decision | Original criterion-by-criterion evidence and any remaining authorization/real-world gap |
 
-Use slices such as “backup restores the original data” or “public build reads exactly one immutable release.” Avoid slicing solely by file name. Include dependencies, expected paths, forbidden paths, acceptance, validation and a stop condition. One worker should own a mutable slice at a time.
+Use slices such as “backup restores the original data” or “public build reads exactly one immutable release.” Avoid slicing solely by file name. Include dependencies, expected paths, forbidden paths, acceptance, validation and a stop condition. One worker should own a mutable slice through implementation, targeted verification and ordinary repairs. Phase rows describe outcomes, not mandatory handoffs. For deep/ambiguous identity, provenance or state transitions, establish invariants and adversarial examples before UI implementation.
 
 Audit false greens, fixture leakage, hidden fallbacks, weakened checks, scope drift, release inconsistency, idempotency, privacy and recovery that exists only on paper. Cosmetic suggestions are not blocking findings. Expensive auditing is optional and evidence-based, not a compulsory stage for every large goal.
 

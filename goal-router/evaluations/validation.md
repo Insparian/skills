@@ -1,5 +1,7 @@
 # Validation report — 2026-09-21
 
+Historical evidence. The [2026-10-24 completion-cost redesign report](2026-10-24-completion-cost.md) supersedes the model-based coordinator boundary and routing behavior described below; retain this report for provenance.
+
 ## Result
 
 The skill package is implemented under `goal-router/`. No parent spec file, global Codex configuration, installed skill, production system or live automation was modified. Personal/project installation is explicit and separate. The package has no runtime dependencies beyond Python 3.9+.

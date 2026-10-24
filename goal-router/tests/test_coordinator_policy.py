@@ -32,14 +32,69 @@ class CoordinatorPolicyTests(unittest.TestCase):
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
         self.assertEqual(read_policy(self.policy)['coordinator_session_id'], 'task-session')
 
-    def test_terra_worker_is_not_blocked_but_sol_worker_stays_thin(self):
+    def test_guard_uses_session_and_worker_turn_not_model(self):
         guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
-        self.assertIsNone(guard_pre_tool(pre('Bash', model='gpt-5.6-terra', turn='worker'),
-                                         self.policy, self.root))
-        update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session', 'agent_id': 'senior-1',
+        for model in ('gpt-6-astra', 'gpt-6.1-sol', 'gpt-5.6-terra', None):
+            result = guard_pre_tool(pre('Bash', model=model), self.policy, self.root)
+            self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+        update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session',
+                          'turn_id': 'worker-turn', 'agent_id': 'senior-1',
                           'agent_type': 'goal-senior', 'model': 'gpt-5.6-sol'}, self.policy)
-        result = guard_pre_tool(pre('Bash', model='gpt-5.6-sol', turn='senior-worker'),
-                                self.policy, self.root)
+        self.assertIsNone(guard_pre_tool(pre('Bash', turn='worker-turn'), self.policy, self.root))
+        result = guard_pre_tool(pre('Bash', turn='unidentified-followup'), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_stopped_worker_turn_does_not_keep_execution_rights(self):
+        guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
+        update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session',
+                          'turn_id': 'worker-turn', 'agent_id': 'worker-1'}, self.policy)
+        update_lifecycle({'hook_event_name': 'SubagentStop', 'session_id': 'task-session',
+                          'agent_id': 'worker-1'}, self.policy)
+        result = guard_pre_tool(pre('Bash', turn='worker-turn'), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_existing_policy_requires_reviewed_replacement(self):
+        original = self.policy.read_text()
+        with self.assertRaises(FileExistsError):
+            create_policy(self.policy)
+        self.assertEqual(self.policy.read_text(), original)
+
+    def test_missing_session_cannot_bypass_bound_policy(self):
+        guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
+        result = guard_pre_tool(pre('Bash', session=None), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_legacy_policy_is_rejected_without_mutation(self):
+        import json
+        value = read_policy(self.policy)
+        value.pop('identity_mode')
+        value['coordinator_models'] = ['gpt-5.6-sol']
+        self.policy.write_text(json.dumps(value))
+        original = self.policy.read_text()
+        result = guard_pre_tool(pre('Bash', model='gpt-6.1-sol'), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+        self.assertEqual(self.policy.read_text(), original)
+        value['coordinator_session_id'] = 'old-task'
+        self.policy.write_text(json.dumps(value))
+        self.assertIsNone(guard_pre_tool(pre('Bash', session='other-task'), self.policy, self.root))
+
+    def test_parent_turn_lifecycle_cannot_exempt_coordinator(self):
+        guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
+        update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session',
+                          'turn_id': 'root-turn', 'agent_id': 'worker-1'}, self.policy)
+        result = guard_pre_tool(pre('Bash'), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_helpers_execute_only_on_confirmed_worker_turn(self):
+        guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
+        command = {'command': 'python3 /skill/scripts/route.py features.json --launch launch.json'}
+        result = guard_pre_tool(pre('Bash', tool_input=command), self.policy, self.root)
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+        update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session',
+                          'turn_id': 'worker-turn', 'agent_id': 'worker-1'}, self.policy)
+        self.assertIsNone(guard_pre_tool(pre('Bash', turn='worker-turn', tool_input=command),
+                                         self.policy, self.root))
+        result = guard_pre_tool(pre('collaborationspawn_agent', turn='worker-turn'), self.policy, self.root)
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_cli_resolves_relative_policy_from_git_root(self):
@@ -85,7 +140,7 @@ class CoordinatorPolicyTests(unittest.TestCase):
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_policy_file_cannot_be_read_or_modified_by_bound_coordinator(self):
-        create_policy(self.policy, checkpoint_paths=['.goal-router/'])
+        create_policy(self.policy, replace=True, checkpoint_paths=['.goal-router/'])
         for tool, tool_input in (
                 ('Read', {'file_path': '.goal-router/coordinator-policy.json'}),
                 ('Edit', {'file_path': '.goal-router/coordinator-policy.json'})):
@@ -116,13 +171,13 @@ class CoordinatorPolicyTests(unittest.TestCase):
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_second_start_waits_for_lifecycle_even_when_limit_is_two(self):
-        create_policy(self.policy, max_active_workers=2)
+        create_policy(self.policy, replace=True, max_active_workers=2)
         self.assertIsNone(guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root))
         result = guard_pre_tool(pre('collaborationspawn_agent', turn='second'), self.policy, self.root)
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_pending_frontier_is_exclusive(self):
-        create_policy(self.policy, max_active_workers=2)
+        create_policy(self.policy, replace=True, max_active_workers=2)
         frontier = pre('collaborationspawn_agent', tool_input={'agent_type': 'goal-frontier'})
         self.assertIsNone(guard_pre_tool(frontier, self.policy, self.root))
         result = guard_pre_tool(pre('collaborationspawn_agent', turn='second',
@@ -161,7 +216,7 @@ class CoordinatorPolicyTests(unittest.TestCase):
         self.assertNotIn('unrelated', read_policy(self.policy)['active_agents'])
 
     def test_frontier_is_exclusive_even_when_two_workers_allowed(self):
-        create_policy(self.policy, max_active_workers=2)
+        create_policy(self.policy, replace=True, max_active_workers=2)
         guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
         update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session', 'agent_id': 'worker-1',
                           'agent_type': 'goal-worker', 'model': 'gpt-5.6-terra'}, self.policy)
@@ -170,7 +225,7 @@ class CoordinatorPolicyTests(unittest.TestCase):
         self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_frontier_model_override_is_also_exclusive(self):
-        create_policy(self.policy, max_active_workers=2)
+        create_policy(self.policy, replace=True, max_active_workers=2)
         guard_pre_tool(pre('collaborationspawn_agent'), self.policy, self.root)
         update_lifecycle({'hook_event_name': 'SubagentStart', 'session_id': 'task-session', 'agent_id': 'worker-1',
                           'agent_type': 'default', 'model': 'gpt-5.6-terra'}, self.policy)
